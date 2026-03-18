@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { Message } from '@/types';
 
 interface MessageListProps {
@@ -71,7 +73,73 @@ function MessageBubble({ message }: { message: Message }) {
             : 'bg-gray-100 text-gray-900 rounded-bl-sm'
         }`}
       >
-        <p className="whitespace-pre-wrap break-words">{message.content}</p>
+        <div className={`prose prose-sm max-w-none ${isUser ? 'prose-invert' : ''}`}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              // Code block styling
+              code({ className, children, ...props }) {
+                const match = /language-(\w+)/.exec(className || '');
+                const isInline = !match;
+                
+                if (isInline) {
+                  return (
+                    <code
+                      className={`px-1.5 py-0.5 rounded text-sm font-mono ${
+                        isUser ? 'bg-blue-700' : 'bg-gray-200'
+                      }`}
+                      {...props}
+                    >
+                      {children}
+                    </code>
+                  );
+                }
+                
+                return (
+                  <div className="relative group my-2">
+                    <div className={`text-xs px-2 py-1 rounded-t ${isUser ? 'bg-blue-700' : 'bg-gray-200'} text-gray-400`}>
+                      {match[1]}
+                    </div>
+                    <code
+                      className={`block p-3 text-sm font-mono overflow-x-auto rounded-b ${
+                        isUser ? 'bg-blue-700' : 'bg-gray-800 text-gray-100'
+                      }`}
+                      {...props}
+                    >
+                      {children}
+                    </code>
+                  </div>
+                );
+              },
+              // Link styling
+              a({ href, children }) {
+                return (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`underline ${isUser ? 'text-blue-200 hover:text-white' : 'text-blue-600 hover:text-blue-800'}`}
+                  >
+                    {children}
+                  </a>
+                );
+              },
+              // Paragraph styling
+              p({ children }) {
+                return <p className="mb-2 last:mb-0 whitespace-pre-wrap">{children}</p>;
+              },
+              // List styling
+              ul({ children }) {
+                return <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>;
+              },
+              ol({ children }) {
+                return <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>;
+              },
+            }}
+          >
+            {message.content}
+          </ReactMarkdown>
+        </div>
         <p
           className={`text-xs mt-1 ${
             isUser ? 'text-blue-200' : 'text-gray-500'
