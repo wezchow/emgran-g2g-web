@@ -1,36 +1,100 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# G2G Web - Frontend
 
-## Getting Started
+G2G Server 前端项目，基于 Next.js 16、React 19、TypeScript 和 Tailwind CSS 4。
 
-First, run the development server:
+## 技术栈
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Framework**: Next.js 16 (App Router)
+- **Language**: TypeScript 5
+- **Styling**: Tailwind CSS 4
+- **React**: React 19
+- **Linting**: ESLint 9
+
+## 项目结构
+
+```
+g2g-web/
+├── src/
+│   ├── app/                 # Next.js App Router
+│   │   ├── layout.tsx       # 根布局
+│   │   ├── page.tsx         # 首页
+│   │   └── globals.css      # 全局样式
+│   ├── components/          # React 组件
+│   │   ├── ui/              # 基础 UI 组件
+│   │   ├── chat/            # 聊天相关组件
+│   │   └── provider/        # Provider 相关组件
+│   ├── lib/                 # 工具库
+│   │   ├── api.ts           # API 客户端
+│   │   └── websocket.ts     # WebSocket 客户端
+│   ├── hooks/               # React Hooks
+│   │   └── use-websocket.ts # WebSocket Hook
+│   └── types/               # TypeScript 类型定义
+│       └── index.ts
+├── public/                  # 静态资源
+├── next.config.ts           # Next.js 配置
+├── tsconfig.json            # TypeScript 配置
+└── package.json             # 项目依赖
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 快速开始
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# 安装依赖
+npm install
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# 开发模式
+npm run dev
 
-## Learn More
+# 构建
+npm run build
 
-To learn more about Next.js, take a look at the following resources:
+# 生产模式
+npm start
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# 代码检查
+npm run lint
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 环境变量
 
-## Deploy on Vercel
+创建 `.env.local` 文件：
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 功能
+
+- ✅ Provider 列表和详情页面
+- ✅ 实时聊天界面
+- ✅ WebSocket 连接管理
+- ✅ 会话管理
+- ✅ 响应式设计
+
+## API 端点
+
+后端 API 基础路径: `/api/v1`
+
+### Providers
+- `GET /providers` - 获取 Provider 列表
+- `GET /providers/:id` - 获取 Provider 详情
+- `POST /providers/register` - 注册 Provider
+
+### Sessions
+- `POST /sessions` - 创建会话
+- `GET /sessions/:id` - 获取会话详情
+- `DELETE /sessions/:id` - 结束会话
+
+### WebSocket
+- `WS /ws?session_id=xxx` - WebSocket 连接
+
+## 开发
+
+```bash
+# 启动开发服务器 (端口 3000)
+npm run dev
+```
+
+## License
+
+MIT
