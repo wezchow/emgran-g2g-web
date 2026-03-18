@@ -3,7 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { MessageList } from './message-list';
 import { MessageInput } from './message-input';
+import { ConnectionStatus, ConnectionBanner } from './connection-status';
 import { useWebSocket } from '@/hooks/use-websocket';
+import { useSessionStore } from '@/store/session-store';
 import { sessionsApi } from '@/lib/api';
 import type { Message, WebSocketMessage } from '@/types';
 
@@ -13,10 +15,21 @@ interface ChatWindowProps {
 }
 
 export function ChatWindow({ providerId, providerName = 'Provider' }: ChatWindowProps) {
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Use session store
+  const {
+    currentSession,
+    messages,
+    connectionStatus,
+    setCurrentSession,
+    addMessage,
+    setConnectionStatus,
+    addToHistory,
+  } = useSessionStore();
+
+  const sessionId = currentSession?.session_id || null;
 
   // Handle incoming WebSocket messages
   const handleWebSocketMessage = useCallback((wsMessage: WebSocketMessage) => {
@@ -28,7 +41,7 @@ export function ChatWindow({ providerId, providerName = 'Provider' }: ChatWindow
         content: wsMessage.content,
         timestamp: new Date(wsMessage.timestamp || Date.now()).toISOString(),
       };
-      setMessages((prev) => [...prev, newMessage]);
+      addMessage(newMessage);
       setIsLoading(false);
     } else if (wsMessage.type === 'system') {
       const systemMessage: Message = {
@@ -38,36 +51,60 @@ export function ChatWindow({ providerId, providerName = 'Provider' }: ChatWindow
         content: wsMessage.content || '',
         timestamp: new Date().toISOString(),
       };
-      setMessages((prev) => [...prev, systemMessage]);
+      addMessage(systemMessage);
+    } else if (wsMessage.type === 'pong') {
+      // Heartbeat response
+      setConnectionStatus('connected');
     } else if (wsMessage.type === 'error') {
       setError(wsMessage.content || 'An error occurred');
       setIsLoading(false);
     }
-  }, [sessionId]);
+  }, [sessionId, addMessage, setConnectionStatus]);
 
   // WebSocket connection
   const { connected, sendChat } = useWebSocket(sessionId, providerId);
+
+  // Sync connection status
+  useEffect(() => {
+    if (connected && connectionStatus !== 'connected') {
+      setConnectionStatus('connected');
+    } else if (!connected && connectionStatus === 'connected') {
+      setConnectionStatus('disconnected');
+    }
+  }, [connected, connectionStatus, setConnectionStatus]);
 
   // Create session on mount
   useEffect(() => {
     const createSession = async () => {
       try {
         setIsLoading(true);
+        setConnectionStatus('connecting');
         const response = await sessionsApi.create({ provider_id: providerId });
         if (response.success && response.data) {
-          setSessionId(response.data.session_id);
+          const session: Session = {
+            session_id: response.data.session_id,
+            provider_id: response.data.provider_id,
+            status: 'active',
+            message_count: 0,
+            created_at: response.data.created_at,
+            updated_at: response.data.created_at,
+          };
+          
+          setCurrentSession(session);
+          addToHistory(session);
           
           // Add system message
-          setMessages([{
+          addMessage({
             id: 'sys-welcome',
-            session_id: response.data.session_id,
+            session_id: session.session_id,
             role: 'system',
             content: `Connected to ${providerName}`,
             timestamp: new Date().toISOString(),
-          }]);
+          });
         }
       } catch (err) {
         setError('Failed to create session');
+        setConnectionStatus('disconnected');
         console.error('Session creation error:', err);
       } finally {
         setIsLoading(false);
@@ -75,7 +112,7 @@ export function ChatWindow({ providerId, providerName = 'Provider' }: ChatWindow
     };
 
     createSession();
-  }, [providerId, providerName]);
+  }, [providerId, providerName, setCurrentSession, addMessage, addToHistory, setConnectionStatus]);
 
   // Send message handler
   const handleSend = useCallback((content: string) => {
@@ -89,12 +126,17 @@ export function ChatWindow({ providerId, providerName = 'Provider' }: ChatWindow
       content,
       timestamp: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, userMessage]);
+    addMessage(userMessage);
     setIsLoading(true);
 
     // Send via WebSocket
     sendChat(content);
-  }, [sessionId, sendChat]);
+  }, [sessionId, addMessage, sendChat]);
+
+  // Retry connection
+  const handleRetry = useCallback(() => {
+    window.location.reload();
+  }, []);
 
   if (error) {
     return (
@@ -102,7 +144,7 @@ export function ChatWindow({ providerId, providerName = 'Provider' }: ChatWindow
         <div className="text-center">
           <div className="text-red-500 mb-2">⚠️ {error}</div>
           <button
-            onClick={() => window.location.reload()}
+            onClick={handleRetry}
             className="text-blue-600 hover:underline"
           >
             Retry
@@ -114,6 +156,9 @@ export function ChatWindow({ providerId, providerName = 'Provider' }: ChatWindow
 
   return (
     <div className="h-full flex flex-col bg-white">
+      {/* Connection Banner */}
+      <ConnectionBanner onRetry={handleRetry} />
+      
       {/* Header */}
       <div className="border-b px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -122,16 +167,7 @@ export function ChatWindow({ providerId, providerName = 'Provider' }: ChatWindow
           </div>
           <div>
             <h2 className="font-semibold">{providerName}</h2>
-            <div className="flex items-center gap-1">
-              <div
-                className={`w-2 h-2 rounded-full ${
-                  connected ? 'bg-green-500' : 'bg-gray-400'
-                }`}
-              />
-              <span className="text-xs text-gray-500">
-                {connected ? 'Connected' : 'Connecting...'}
-              </span>
-            </div>
+            <ConnectionStatus />
           </div>
         </div>
       </div>
@@ -142,9 +178,12 @@ export function ChatWindow({ providerId, providerName = 'Provider' }: ChatWindow
       {/* Input */}
       <MessageInput
         onSend={handleSend}
-        disabled={!connected || !sessionId}
-        placeholder={connected ? 'Type a message...' : 'Connecting...'}
+        disabled={connectionStatus !== 'connected' || !sessionId}
+        placeholder={connectionStatus === 'connected' ? 'Type a message...' : 'Connecting...'}
       />
     </div>
   );
 }
+
+// Add Session type import
+import type { Session } from '@/types';
